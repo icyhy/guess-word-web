@@ -1,0 +1,96 @@
+# AI猜词游戏 - Web版
+
+一个有趣的中文AI猜词游戏，玩家需要描述词语让AI来猜测，但不能直接说出词语本身。
+
+## 功能特性
+
+- 中文界面和中文词汇库
+- 单人挑战模式和双人对抗模式
+- 智能AI猜测系统
+- 防作弊机制（检测是否直接说出词语）
+- 响应式Web界面
+- 可配置的游戏时长和回合时间
+- 实时计分系统
+
+## 游戏规则
+
+1. 游戏会随机生成一个中文词语并显示给当前玩家
+2. 当前玩家需要描述这个词语，让AI猜测
+3. **重要**: 不能直接说出词语本身或其近义词，否则会被检测为作弊
+4. 每轮限时60秒，在这期间可以进行多轮描述和猜测
+5. 每次描述后，AI会利用所有已提供的信息进行猜测
+6. 如果AI猜对了词语，当前玩家获得一分，并立即进入下一轮
+7. 如果时间到了仍未猜出，系统会自动进入下一轮
+8. 玩家也可以点击"跳过本轮"按钮主动跳过
+9. 总游戏时间为5分钟
+
+## 安装和运行
+
+1. 确保已安装Node.js
+2. 安装依赖包:
+
+```bash
+npm install
+```
+
+3. 设置DeepSeek API密钥（可选，但强烈推荐）:
+
+```bash
+export DEEPSEEK_API_KEY="your-api-key-here"
+```
+
+4. 启动服务器:
+
+```bash
+npm start
+```
+
+或者使用项目自带的启动脚本（需要先设置环境变量）:
+
+```bash
+export DEEPSEEK_API_KEY="your-api-key-here"
+./start-server.sh
+```
+
+5. 在浏览器中打开 `http://localhost:3000`
+
+注意：如果未设置API密钥，系统将使用备用的本地逻辑进行词语猜测。
+
+## 项目结构
+
+```
+guess-word-web/
+├── public/                 # 前端静态文件
+│   ├── index.html          # 主页面
+│   ├── styles.css          # 样式文件
+│   └── script.js           # 前端JavaScript
+├── src/                    # 源代码
+│   ├── words.json          # 中文词汇库
+│   ├── ai-interface.js     # AI猜测逻辑
+│   └── cheat-detector.js   # 防作弊检测
+├── server.js               # 后端服务器
+├── package.json            # 项目配置
+└── README.md               # 说明文档
+```
+
+## 技术栈
+
+- 前端: HTML, CSS, JavaScript
+- 后端: Node.js, Express.js
+- AI逻辑: DeepSeek API (支持语言理解能力)
+- 防作弊: 文本相似度检测
+- 依赖: axios (用于API调用)
+
+## API接口
+
+- `GET /api/random-word` - 获取随机词语
+- `POST /api/guess` - AI猜测（需提供描述）
+- `POST /api/check-cheat` - 检查是否作弊（需提供原词和描述）
+- `GET /api/words` - 获取词汇库
+
+## 示例玩法
+
+玩家看到词语"苹果"，可以这样描述：
+- ✅ "一种红色或绿色的水果，很甜，可以吃，有果核"
+- ❌ "苹果" (直接说出词语)
+- ❌ "水果" (过于宽泛，但不会被判定为作弊)
