@@ -1,111 +1,120 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI猜词游戏</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Inter:wght@400;500;700&display=swap"
+    rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
-  <div class="container">
-    <header>
-      <h1>🎮 AI猜词游戏</h1>
-      <p>描述一个词让AI来猜，但不要直接说出这个词！</p>
-    </header>
+  <div class="background-blobs">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+  </div>
+  <div class="main-wrapper">
+    <div class="container">
+      <header>
+        <h1>🎮 AI猜词游戏</h1>
+        <p>描述一个词让AI来猜，但不要直接说出这个词！</p>
+      </header>
 
-    <div class="game-area">
-      <!-- 游戏模式选择 -->
-      <div id="mode-selection" class="section">
-        <h2>选择游戏模式</h2>
-        <div class="mode-buttons">
-          <button id="single-player-btn" class="mode-btn">单人挑战</button>
-          <button id="dual-player-btn" class="mode-btn">双人对抗</button>
-        </div>
-      </div>
-
-      <!-- 玩家信息输入 -->
-      <div id="player-input" class="section hidden">
-        <h2>输入玩家信息</h2>
-        <div id="player1-input">
-          <label for="player1-name">玩家1姓名:</label>
-          <input type="text" id="player1-name" placeholder="请输入您的姓名">
-        </div>
-        <div id="player2-input" class="hidden">
-          <label for="player2-name">玩家2姓名:</label>
-          <input type="text" id="player2-name" placeholder="请输入玩家2姓名">
-        </div>
-        <button id="start-game-btn" class="btn-primary">开始游戏</button>
-      </div>
-
-      <!-- 游戏界面 -->
-      <div id="game-interface" class="section hidden">
-        <div class="game-info">
-          <div class="timer">
-            <span>本轮剩余时间: </span>
-            <span id="round-timer">30</span>s
-          </div>
-          <div class="timer">
-            <span>总游戏时间: </span>
-            <span id="game-timer">300</span>s
+      <div class="game-area">
+        <!-- 游戏模式选择 -->
+        <div id="mode-selection" class="section">
+          <h2>选择游戏模式</h2>
+          <div class="mode-buttons">
+            <button id="single-player-btn" class="mode-btn">单人挑战</button>
+            <button id="dual-player-btn" class="mode-btn">双人对抗</button>
           </div>
         </div>
 
-        <div class="current-word-display">
-          <h3>当前词语:</h3>
-          <div id="current-word" class="word-box">[词语]</div>
+        <!-- 玩家信息输入 -->
+        <div id="player-input" class="section hidden">
+          <h2>输入玩家信息</h2>
+          <div id="player1-input">
+            <label for="player1-name">玩家1姓名:</label>
+            <input type="text" id="player1-name" placeholder="请输入您的姓名">
+          </div>
+          <div id="player2-input" class="hidden">
+            <label for="player2-name">玩家2姓名:</label>
+            <input type="text" id="player2-name" placeholder="请输入玩家2姓名">
+          </div>
+          <button id="start-game-btn" class="btn-primary">开始游戏</button>
         </div>
 
-        <div class="current-player">
-          <h3>当前玩家:</h3>
-          <div id="current-player-name">-</div>
-        </div>
-
-        <div class="score-board">
-          <h3>得分:</h3>
-          <div id="scores">
-            <div class="player-score">
-              <span id="player1-score-label">玩家1:</span>
-              <span id="player1-score">0</span>
+        <!-- 游戏界面 -->
+        <div id="game-interface" class="section hidden">
+          <div class="game-header-compact">
+            <div class="game-info">
+              <div class="timer">
+                <span>轮剩余</span>
+                <span id="round-timer">30</span>
+              </div>
+              <div class="timer">
+                <span>总剩余</span>
+                <span id="game-timer">300</span>
+              </div>
             </div>
-            <div class="player-score">
-              <span id="player2-score-label">玩家2:</span>
-              <span id="player2-score">0</span>
+            <div class="game-score-compact">
+              <div class="score-item">
+                <span id="player1-score-label">P1:</span>
+                <span id="player1-score">0</span>
+              </div>
+              <div class="score-item dual-only hidden">
+                <span id="player2-score-label">P2:</span>
+                <span id="player2-score">0</span>
+              </div>
+            </div>
+            <div class="current-player-compact">
+              <span id="current-player-name">-</span>
             </div>
           </div>
-        </div>
 
-        <div class="game-controls">
-          <textarea 
-            id="description-input" 
-            placeholder="请描述这个词语，但不要直接说出词语本身..." 
-            maxlength="200"></textarea>
-          <div class="input-controls">
-            <button id="submit-description" class="btn-primary">提交描述</button>
-            <button id="skip-round" class="btn-secondary">跳过本轮</button>
+          <div class="primary-game-box">
+            <div class="current-word-display">
+              <div id="current-word" class="word-box">[词语]</div>
+            </div>
+
+            <div class="game-controls">
+              <textarea id="description-input" placeholder="请描述这个词语..." maxlength="200"></textarea>
+              <div class="input-controls">
+                <button id="submit-description" class="btn-primary">提交描述</button>
+                <button id="skip-round" class="btn-secondary">跳过</button>
+              </div>
+            </div>
           </div>
+
+          <div class="secondary-info-box">
+            <div class="game-log">
+              <div id="log-container"></div>
+            </div>
+          </div>
+
+          <button id="end-game" class="btn-danger">结束游戏</button>
         </div>
 
-        <div class="game-log">
-          <h3>游戏记录:</h3>
-          <div id="log-container"></div>
+        <!-- 游戏结束界面 -->
+        <div id="game-over" class="section hidden">
+          <h2>游戏结束</h2>
+          <div id="final-scores">
+            <h3>最终得分:</h3>
+            <div id="final-score-list"></div>
+          </div>
+          <div id="winner-message"></div>
+          <button id="play-again" class="btn-primary">再来一局</button>
         </div>
-
-        <button id="end-game" class="btn-danger">结束游戏</button>
-      </div>
-
-      <!-- 游戏结束界面 -->
-      <div id="game-over" class="section hidden">
-        <h2>游戏结束</h2>
-        <div id="final-scores">
-          <h3>最终得分:</h3>
-          <div id="final-score-list"></div>
-        </div>
-        <div id="winner-message"></div>
-        <button id="play-again" class="btn-primary">再来一局</button>
       </div>
     </div>
-  </div>
 
-  <script src="script.js"></script>
+    <script src="script.js"></script>
 </body>
+
 </html>

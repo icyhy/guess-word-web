@@ -15,7 +15,7 @@ class ChineseGuessWordGame {
       gameInterval: null,
       roundDescriptions: [] // 记录本轮所有描述
     };
-    
+
     this.initializeElements();
     this.bindEvents();
     this.loadWords();
@@ -26,7 +26,7 @@ class ChineseGuessWordGame {
     this.modeSelection = document.getElementById('mode-selection');
     this.singlePlayerBtn = document.getElementById('single-player-btn');
     this.dualPlayerBtn = document.getElementById('dual-player-btn');
-    
+
     // 玩家输入
     this.playerInput = document.getElementById('player-input');
     this.player1Input = document.getElementById('player1-input');
@@ -34,7 +34,7 @@ class ChineseGuessWordGame {
     this.player1Name = document.getElementById('player1-name');
     this.player2Name = document.getElementById('player2-name');
     this.startGameBtn = document.getElementById('start-game-btn');
-    
+
     // 游戏界面
     this.gameInterface = document.getElementById('game-interface');
     this.roundTimerEl = document.getElementById('round-timer');
@@ -50,7 +50,7 @@ class ChineseGuessWordGame {
     this.skipRoundBtn = document.getElementById('skip-round');
     this.logContainer = document.getElementById('log-container');
     this.endGameBtn = document.getElementById('end-game');
-    
+
     // 游戏结束
     this.gameOver = document.getElementById('game-over');
     this.finalScoreList = document.getElementById('final-score-list');
@@ -62,18 +62,18 @@ class ChineseGuessWordGame {
     // 模式选择事件
     this.singlePlayerBtn.addEventListener('click', () => this.setGameMode('single'));
     this.dualPlayerBtn.addEventListener('click', () => this.setGameMode('dual'));
-    
+
     // 开始游戏事件
     this.startGameBtn.addEventListener('click', () => this.startGame());
-    
+
     // 游戏控制事件
     this.submitDescriptionBtn.addEventListener('click', () => this.handleSubmitDescription());
     this.skipRoundBtn.addEventListener('click', () => this.handleSkipRound());
     this.endGameBtn.addEventListener('click', () => this.endGame());
-    
+
     // 再来一局事件
     this.playAgainBtn.addEventListener('click', () => this.resetGame());
-    
+
     // 回车提交描述
     this.descriptionInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
@@ -104,20 +104,20 @@ class ChineseGuessWordGame {
         "不切实际", "透明", "合朔", "万能药", "矛盾修辞", "黄道带"
       ]
     };
-    
+
     // 合并所有难度的词
     this.allWords = [...this.words.common, ...this.words.medium, ...this.words.hard];
   }
 
   setGameMode(mode) {
     this.gameState.gameMode = mode;
-    
+
     if (mode === 'dual') {
       this.player2Input.classList.remove('hidden');
     } else {
       this.player2Input.classList.add('hidden');
     }
-    
+
     this.modeSelection.classList.add('hidden');
     this.playerInput.classList.remove('hidden');
   }
@@ -125,37 +125,41 @@ class ChineseGuessWordGame {
   startGame() {
     const player1Name = this.player1Name.value.trim() || '玩家1';
     let player2Name = '';
-    
+
     if (this.gameState.gameMode === 'dual') {
       player2Name = this.player2Name.value.trim() || '玩家2';
     }
-    
+
     // 初始化玩家
     this.gameState.players = [player1Name];
-    this.gameState.scores = {[player1Name]: 0};
-    
+    this.gameState.scores = { [player1Name]: 0 };
+
     if (this.gameState.gameMode === 'dual') {
       this.gameState.players.push(player2Name);
       this.gameState.scores[player2Name] = 0;
     }
-    
+
     // 更新UI标签
-    this.player1ScoreLabel.textContent = `${player1Name}:`;
+    if (this.player1ScoreLabel) this.player1ScoreLabel.textContent = `${player1Name}:`;
+    const p2ScoreItem = document.querySelector('.score-item.dual-only');
     if (this.gameState.gameMode === 'dual') {
-      this.player2ScoreLabel.textContent = `${player2Name}:`;
+      if (p2ScoreItem) p2ScoreItem.classList.remove('hidden');
+      if (this.player2ScoreLabel) this.player2ScoreLabel.textContent = `${player2Name}:`;
+    } else {
+      if (p2ScoreItem) p2ScoreItem.classList.add('hidden');
     }
-    
+
     this.gameState.isRunning = true;
     this.gameState.currentPlayerIndex = 0;
-    
+
     // 隐藏输入界面，显示游戏界面
     this.playerInput.classList.add('hidden');
     this.gameInterface.classList.remove('hidden');
-    
+
     // 开始游戏
     this.startNewRound();
     this.startTimers();
-    
+
     this.addLogEntry('system', `游戏开始！模式: ${this.gameState.gameMode === 'single' ? '单人挑战' : '双人对抗'}`, true);
   }
 
@@ -163,24 +167,24 @@ class ChineseGuessWordGame {
     if (!this.gameState.isRunning) return;
 
     const currentPlayer = this.gameState.players[this.gameState.currentPlayerIndex];
-    
+
     // 更新当前玩家显示
     this.currentPlayerNameEl.textContent = currentPlayer;
-    
+
     // 生成随机词语
     this.gameState.currentWord = this.getRandomWord();
     this.currentWordEl.textContent = this.gameState.currentWord;
-    
+
     // 重置本轮时间
     this.gameState.roundTimeLeft = this.gameState.roundTime;
     this.updateTimerDisplay();
-    
+
     // 重置本轮描述历史
     this.gameState.roundDescriptions = [];
-    
+
     // 清空描述输入框
     this.descriptionInput.value = '';
-    
+
     this.addLogEntry('system', `轮到 ${currentPlayer}，词语是: ${this.gameState.currentWord}`, true);
   }
 
@@ -202,13 +206,13 @@ class ChineseGuessWordGame {
     }
 
     const currentPlayer = this.gameState.players[this.gameState.currentPlayerIndex];
-    
+
     // 添加描述到本轮描述历史
     this.gameState.roundDescriptions.push(description);
-    
+
     // 添加玩家描述到日志
     this.addLogEntry('player', `${currentPlayer}: "${description}"`);
-    
+
     // 检查是否作弊（这里只是模拟，实际需要调用后端API）
     if (this.isCheating(this.gameState.currentWord, description)) {
       this.addLogEntry('system', `检测到作弊！${currentPlayer} 直接说出了词语或其近义词。本轮跳过。`);
@@ -218,9 +222,12 @@ class ChineseGuessWordGame {
 
     // 模拟AI猜测（实际应该调用后端API）
     this.addLogEntry('system', 'AI正在思考...');
-    
+
     try {
       // 调用后端AI接口
+      this.submitDescriptionBtn.disabled = true;
+      this.submitDescriptionBtn.innerHTML = '<span class="loading-spinner"></span> 正在思考...';
+
       const response = await fetch('/api/guess', {
         method: 'POST',
         headers: {
@@ -231,27 +238,30 @@ class ChineseGuessWordGame {
           allDescriptions: this.gameState.roundDescriptions
         })
       });
-      
+
       const data = await response.json();
-      
+
+      this.submitDescriptionBtn.disabled = false;
+      this.submitDescriptionBtn.textContent = '提交描述';
+
       if (response.ok) {
         const aiGuess = data.guess;
         this.addLogEntry('ai', `AI猜测: ${aiGuess}`);
-        
+
         // 检查AI是否猜对
         if (aiGuess === this.gameState.currentWord) {
           this.gameState.scores[currentPlayer]++;
           this.updateScoresDisplay();
-          
+
           this.addLogEntry('system', `🎉 恭喜！AI猜对了！${currentPlayer} 得1分。`);
-          
+
           // AI猜对了，进入下一轮
           setTimeout(() => {
             this.nextRound();
           }, 2000);
         } else {
           this.addLogEntry('system', `AI猜错了。还有 ${this.gameState.roundTimeLeft} 秒继续描述。`);
-          
+
           // 清空输入框，等待下一次描述
           this.descriptionInput.value = '';
           this.descriptionInput.focus();
@@ -262,7 +272,7 @@ class ChineseGuessWordGame {
     } catch (error) {
       console.error('AI猜测错误:', error);
       this.addLogEntry('system', `AI猜测出现错误: ${error.message}`);
-      
+
       // 清空输入框，等待下一次描述
       this.descriptionInput.value = '';
       this.descriptionInput.focus();
@@ -277,7 +287,7 @@ class ChineseGuessWordGame {
 
     const currentPlayer = this.gameState.players[this.gameState.currentPlayerIndex];
     this.addLogEntry('system', `${currentPlayer} 选择了跳过本轮。正确答案是: ${this.gameState.currentWord}`);
-    
+
     this.nextRound();
   }
 
@@ -300,18 +310,18 @@ class ChineseGuessWordGame {
     this.gameState.roundInterval = setInterval(() => {
       this.gameState.roundTimeLeft--;
       this.updateTimerDisplay();
-      
+
       if (this.gameState.roundTimeLeft <= 0) {
         this.addLogEntry('system', `⏰ 时间到！本轮结束，词语是: ${this.gameState.currentWord}`);
         this.nextRound();
       }
     }, 1000);
-    
+
     // 总游戏计时器
     this.gameState.gameInterval = setInterval(() => {
       this.gameState.gameTimeLeft--;
       this.updateTimerDisplay();
-      
+
       if (this.gameState.gameTimeLeft <= 0) {
         this.endGame();
       }
@@ -325,11 +335,11 @@ class ChineseGuessWordGame {
 
   updateScoresDisplay() {
     const player1Name = this.gameState.players[0];
-    this.player1Score.textContent = this.gameState.scores[player1Name] || 0;
-    
+    if (this.player1Score) this.player1Score.textContent = this.gameState.scores[player1Name] || 0;
+
     if (this.gameState.gameMode === 'dual' && this.gameState.players.length > 1) {
       const player2Name = this.gameState.players[1];
-      this.player2Score.textContent = this.gameState.scores[player2Name] || 0;
+      if (this.player2Score) this.player2Score.textContent = this.gameState.scores[player2Name] || 0;
     }
   }
 
@@ -338,22 +348,21 @@ class ChineseGuessWordGame {
     entry.className = `log-entry ${type}`;
     entry.textContent = message;
     this.logContainer.appendChild(entry);
-    
-    if (scrollToBottom) {
-      this.logContainer.scrollTop = this.logContainer.scrollHeight;
-    }
+
+    // 始终自动滚动到底部
+    this.logContainer.scrollTop = this.logContainer.scrollHeight;
   }
 
   isCheating(originalWord, description) {
     // 简单的防作弊检测（实际应该调用后端API）
     const normalizedOriginal = this.normalizeText(originalWord);
     const normalizedDescription = this.normalizeText(description);
-    
+
     // 检查是否直接包含原词
     if (normalizedDescription.includes(normalizedOriginal)) {
       return true;
     }
-    
+
     // 这里可以添加更复杂的检测逻辑
     return false;
   }
@@ -365,9 +374,9 @@ class ChineseGuessWordGame {
   simulateAIGuess(description) {
     // 模拟AI猜测逻辑，基于描述中的关键词
     const keywords = description.replace(/[^\u4e00-\u9fa5\w\s]/g, ' ')
-                               .split(/\s+/)
-                               .filter(k => k.length > 0);
-    
+      .split(/\s+/)
+      .filter(k => k.length > 0);
+
     // 简单的匹配逻辑，实际应该调用后端AI接口
     if (keywords.some(k => k.includes('水果'))) {
       return ['苹果', '香蕉'].sort(() => Math.random() - 0.5)[0];
@@ -392,14 +401,14 @@ class ChineseGuessWordGame {
     } else if (keywords.some(k => k.includes('喵') || k.includes('抓'))) {
       return '猫';
     }
-    
+
     // 随机返回一个词
     return this.allWords[Math.floor(Math.random() * 20)]; // 前20个常用词
   }
 
   endGame() {
     this.gameState.isRunning = false;
-    
+
     // 清除定时器
     if (this.gameState.roundInterval) {
       clearInterval(this.gameState.roundInterval);
@@ -407,10 +416,10 @@ class ChineseGuessWordGame {
     if (this.gameState.gameInterval) {
       clearInterval(this.gameState.gameInterval);
     }
-    
+
     // 显示最终得分
     this.showFinalScores();
-    
+
     // 隐藏游戏界面，显示结束界面
     this.gameInterface.classList.add('hidden');
     this.gameOver.classList.remove('hidden');
@@ -419,7 +428,7 @@ class ChineseGuessWordGame {
   showFinalScores() {
     // 清空之前的分数显示
     this.finalScoreList.innerHTML = '';
-    
+
     // 显示每个玩家的分数
     for (const [player, score] of Object.entries(this.gameState.scores)) {
       const scoreItem = document.createElement('div');
@@ -430,7 +439,7 @@ class ChineseGuessWordGame {
       `;
       this.finalScoreList.appendChild(scoreItem);
     }
-    
+
     // 找出获胜者
     let winner = '';
     let highestScore = -1;
@@ -440,7 +449,7 @@ class ChineseGuessWordGame {
         winner = player;
       }
     }
-    
+
     if (winner) {
       this.winnerMessage.innerHTML = `🏆 获胜者: <strong>${winner}</strong> (${highestScore} 分)`;
     } else {
@@ -456,7 +465,7 @@ class ChineseGuessWordGame {
     if (this.gameState.gameInterval) {
       clearInterval(this.gameState.gameInterval);
     }
-    
+
     // 重置游戏状态
     this.gameState = {
       isRunning: false,
@@ -472,26 +481,26 @@ class ChineseGuessWordGame {
       roundInterval: null,
       gameInterval: null
     };
-    
+
     // 重置UI
     this.gameOver.classList.add('hidden');
     this.modeSelection.classList.remove('hidden');
-    
+
     // 清空输入
     this.player1Name.value = '';
     this.player2Name.value = '';
     this.player2Input.classList.add('hidden');
-    
+
     // 清空日志
     this.logContainer.innerHTML = '';
-    
+
     // 重置显示
-    this.currentWordEl.textContent = '[词语]';
-    this.currentPlayerNameEl.textContent = '-';
-    this.player1Score.textContent = '0';
-    this.player2Score.textContent = '0';
-    this.roundTimerEl.textContent = '30';
-    this.gameTimerEl.textContent = '300';
+    if (this.currentWordEl) this.currentWordEl.textContent = '[词语]';
+    if (this.currentPlayerNameEl) this.currentPlayerNameEl.textContent = '-';
+    if (this.player1Score) this.player1Score.textContent = '0';
+    if (this.player2Score) this.player2Score.textContent = '0';
+    if (this.roundTimerEl) this.roundTimerEl.textContent = '30';
+    if (this.gameTimerEl) this.gameTimerEl.textContent = '300';
   }
 }
 
