@@ -1,510 +1,330 @@
 class ChineseGuessWordGame {
   constructor() {
+    this.socket = io();
+    this.roomId = null;
+    this.playerName = '';
+    this.isServerActive = false;
+
     this.gameState = {
+      gameMode: 'single',
       isRunning: false,
-      players: [],
-      currentPlayerIndex: 0,
-      currentWord: '',
-      scores: {},
-      gameMode: 'single', // 'single' or 'dual'
-      roundTime: 60, // 增加到60秒
-      totalTime: 300,
-      roundTimeLeft: 60, // 增加到60秒
-      gameTimeLeft: 300,
-      roundInterval: null,
-      gameInterval: null,
-      roundDescriptions: [] // 记录本轮所有描述
+      words: [],
+      currentIndex: 0,
+      score: 0,
+      timeLeft: 300,
+      timer: null,
+      roundDescriptions: []
     };
 
-    this.initializeElements();
+    this.initElements();
+    this.initSocket();
     this.bindEvents();
-    this.loadWords();
   }
 
-  initializeElements() {
-    // 模式选择
+  initElements() {
+    // UI Panels
     this.modeSelection = document.getElementById('mode-selection');
-    this.singlePlayerBtn = document.getElementById('single-player-btn');
-    this.dualPlayerBtn = document.getElementById('dual-player-btn');
-
-    // 玩家输入
-    this.playerInput = document.getElementById('player-input');
-    this.player1Input = document.getElementById('player1-input');
-    this.player2Input = document.getElementById('player2-input');
-    this.player1Name = document.getElementById('player1-name');
-    this.player2Name = document.getElementById('player2-name');
-    this.startGameBtn = document.getElementById('start-game-btn');
-
-    // 游戏界面
+    this.roomJoinInput = document.getElementById('room-join-input');
+    this.playerNameInput = document.getElementById('player-name-input');
     this.gameInterface = document.getElementById('game-interface');
-    this.roundTimerEl = document.getElementById('round-timer');
-    this.gameTimerEl = document.getElementById('game-timer');
-    this.currentWordEl = document.getElementById('current-word');
-    this.currentPlayerNameEl = document.getElementById('current-player-name');
-    this.player1Score = document.getElementById('player1-score');
-    this.player2Score = document.getElementById('player2-score');
-    this.player1ScoreLabel = document.getElementById('player1-score-label');
-    this.player2ScoreLabel = document.getElementById('player2-score-label');
-    this.descriptionInput = document.getElementById('description-input');
-    this.submitDescriptionBtn = document.getElementById('submit-description');
-    this.skipRoundBtn = document.getElementById('skip-round');
-    this.logContainer = document.getElementById('log-container');
+    this.gameOver = document.getElementById('game-over');
+    this.countdownOverlay = document.getElementById('countdown-overlay');
+
+    // Controls
+    this.singlePlayerBtn = document.getElementById('single-player-btn');
+    this.createRoomBtn = document.getElementById('create-room-btn');
+    this.joinRoomBtn = document.getElementById('join-room-btn');
+    this.confirmJoinBtn = document.getElementById('confirm-join-btn');
+    this.confirmNameBtn = document.getElementById('confirm-name-btn');
+    this.submitDescBtn = document.getElementById('submit-description');
+    this.skipBtn = document.getElementById('skip-round');
+    this.playAgainBtn = document.getElementById('play-again');
     this.endGameBtn = document.getElementById('end-game');
 
-    // 游戏结束
-    this.gameOver = document.getElementById('game-over');
+    // Inputs
+    this.joinRoomIdInput = document.getElementById('join-room-id');
+    this.playerNameInputEl = document.getElementById('player-name');
+    this.descriptionInput = document.getElementById('description-input');
+
+    // Display
+    this.displayRoomId = document.getElementById('display-room-id');
+    this.roomInfoDisplay = document.getElementById('room-info-display');
+    this.readyStatusMsg = document.getElementById('ready-status-msg');
+    this.opponentStatus = document.getElementById('opponent-status');
+    this.gameTimerEl = document.getElementById('game-timer');
+    this.currentWordEl = document.getElementById('current-word');
+    this.roundInfoEl = document.getElementById('round-info');
+    this.oppProgressBadge = document.getElementById('opponent-progress');
+    this.oppScoreEl = document.getElementById('opp-score');
+    this.logContainer = document.getElementById('log-container');
     this.finalScoreList = document.getElementById('final-score-list');
-    this.winnerMessage = document.getElementById('winner-message');
-    this.playAgainBtn = document.getElementById('play-again');
+    this.winnerMsg = document.getElementById('winner-message');
+  }
+
+  initSocket() {
+    this.socket.on('room-created', ({ roomId }) => {
+      this.roomId = roomId;
+      this.displayRoomId.textContent = roomId;
+      this.roomInfoDisplay.classList.remove('hidden');
+      this.modeSelection.classList.add('hidden');
+      this.playerNameInput.classList.remove('hidden');
+    });
+
+    this.socket.on('player-joined', ({ players }) => {
+      if (players.length === 2) {
+        this.addLogEntry('system', '对手已进入房间');
+        this.opponentStatus.innerHTML = '<p>对手已加入，正在等待就绪...</p>';
+      }
+    });
+
+    this.socket.on('ready-update', ({ players }) => {
+      const opponent = players.find(p => p.id !== this.socket.id);
+      if (opponent && opponent.ready) {
+        this.opponentStatus.innerHTML = '<p>✅ 对手已就绪！</p>';
+      }
+    });
+
+    this.socket.on('start-countdown', ({ words }) => {
+      this.gameState.words = words;
+      this.showCountdown();
+    });
+
+    this.socket.on('game-started', () => {
+      this.startGameLogic();
+    });
+
+    this.socket.on('opponent-progress', ({ score, currentIndex, finished }) => {
+      this.oppScoreEl.textContent = score;
+      if (finished) {
+        this.addLogEntry('system', '对手已完成所有挑战！');
+      }
+    });
+
+    this.socket.on('dual-game-over', ({ results }) => {
+      this.endGame(results);
+    });
+
+    this.socket.on('error-msg', (msg) => { alert(msg); });
   }
 
   bindEvents() {
-    // 模式选择事件
-    this.singlePlayerBtn.addEventListener('click', () => this.setGameMode('single'));
-    this.dualPlayerBtn.addEventListener('click', () => this.setGameMode('dual'));
+    this.singlePlayerBtn.onclick = () => this.startSingleMode();
 
-    // 开始游戏事件
-    this.startGameBtn.addEventListener('click', () => this.startGame());
-
-    // 游戏控制事件
-    this.submitDescriptionBtn.addEventListener('click', () => this.handleSubmitDescription());
-    this.skipRoundBtn.addEventListener('click', () => this.handleSkipRound());
-    this.endGameBtn.addEventListener('click', () => this.endGame());
-
-    // 再来一局事件
-    this.playAgainBtn.addEventListener('click', () => this.resetGame());
-
-    // 回车提交描述
-    this.descriptionInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        this.handleSubmitDescription();
-      }
-    });
-  }
-
-  loadWords() {
-    // 在实际应用中，这里会从服务器加载词汇
-    // 现在我们使用一个简单的中文词库
-    this.words = {
-      common: [
-        "苹果", "香蕉", "电脑", "书本", "房子", "汽车", "电话", "水", "太阳", "树",
-        "狗", "猫", "鸟", "鱼", "花", "椅子", "桌子", "门", "窗户", "床",
-        "钟表", "灯光", "音乐", "食物", "饮料", "衬衫", "裤子", "鞋子", "帽子", "包",
-        "笔", "铅笔", "纸", "钱", "工作", "玩耍", "快乐", "悲伤", "大", "小"
-      ],
-      medium: [
-        "望远镜", "显微镜", "实验室", "大学", "毕业证书", "护照", "假期", "冒险",
-        "字典", "百科全书", "直升机", "潜水艇", "卫星", "宇航员", "火山", "地震",
-        "蝴蝶", "大象", "长颈鹿", "鳄鱼", "袋鼠", "企鹅", "黑猩猩", "犀牛"
-      ],
-      hard: [
-        "拟声词", "意外发现", "顿悟", "典型", "普遍存在", "短暂", "悦耳",
-        "多音节", "窗前投掷", "高傲", "敏锐", "史前", "迷宫般",
-        "不切实际", "透明", "合朔", "万能药", "矛盾修辞", "黄道带"
-      ]
+    this.createRoomBtn.onclick = () => {
+      this.gameState.gameMode = 'dual';
+      this.playerNameInputEl.placeholder = "请输入您的姓名";
+      this.socket.emit('create-room', ''); // 先不传名，后面confirm传
     };
 
-    // 合并所有难度的词
-    this.allWords = [...this.words.common, ...this.words.medium, ...this.words.hard];
+    this.joinRoomBtn.onclick = () => {
+      this.modeSelection.classList.add('hidden');
+      this.roomJoinInput.classList.remove('hidden');
+    };
+
+    this.confirmJoinBtn.onclick = () => {
+      const rid = this.joinRoomIdInput.value.trim().toUpperCase();
+      if (!rid) return alert('请输入房间号');
+      this.roomId = rid;
+      this.gameState.gameMode = 'dual';
+      this.roomJoinInput.classList.add('hidden');
+      this.playerNameInput.classList.remove('hidden');
+      this.displayRoomId.textContent = rid;
+      this.roomInfoDisplay.classList.remove('hidden');
+    };
+
+    this.confirmNameBtn.onclick = () => {
+      const name = this.playerNameInputEl.value.trim() || '匿大侠';
+      this.playerName = name;
+      this.playerNameInputEl.disabled = true;
+      this.confirmNameBtn.classList.add('hidden');
+      this.readyStatusMsg.classList.remove('hidden');
+      this.opponentStatus.classList.remove('hidden');
+
+      if (this.gameState.gameMode === 'dual') {
+        // 如果是加入者，现在正式加入
+        if (!this.socket.rooms || !this.socket.rooms.has(this.roomId)) {
+          this.socket.emit('join-room', { roomId: this.roomId, playerName: name });
+        }
+        this.socket.emit('player-ready', this.roomId);
+      } else {
+        this.showCountdown();
+      }
+    };
+
+    this.submitDescBtn.onclick = () => this.handleSubmit();
+    this.skipBtn.onclick = () => this.handleSkip();
+    this.endGameBtn.onclick = () => this.endGame();
+    this.playAgainBtn.onclick = () => location.reload();
+
+    this.descriptionInput.onkeypress = (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.handleSubmit(); }
+    };
   }
 
-  setGameMode(mode) {
-    this.gameState.gameMode = mode;
-
-    if (mode === 'dual') {
-      this.player2Input.classList.remove('hidden');
-    } else {
-      this.player2Input.classList.add('hidden');
-    }
-
+  startSingleMode() {
+    this.gameState.gameMode = 'single';
     this.modeSelection.classList.add('hidden');
-    this.playerInput.classList.remove('hidden');
+    this.playerNameInput.classList.remove('hidden');
+    this.opponentStatus.classList.add('hidden');
+    this.roomInfoDisplay.classList.add('hidden');
   }
 
-  startGame() {
-    const player1Name = this.player1Name.value.trim() || '玩家1';
-    let player2Name = '';
-
-    if (this.gameState.gameMode === 'dual') {
-      player2Name = this.player2Name.value.trim() || '玩家2';
-    }
-
-    // 初始化玩家
-    this.gameState.players = [player1Name];
-    this.gameState.scores = { [player1Name]: 0 };
-
-    if (this.gameState.gameMode === 'dual') {
-      this.gameState.players.push(player2Name);
-      this.gameState.scores[player2Name] = 0;
-    }
-
-    // 更新UI标签
-    if (this.player1ScoreLabel) this.player1ScoreLabel.textContent = `${player1Name}:`;
-    const p2ScoreItem = document.querySelector('.score-item.dual-only');
-    if (this.gameState.gameMode === 'dual') {
-      if (p2ScoreItem) p2ScoreItem.classList.remove('hidden');
-      if (this.player2ScoreLabel) this.player2ScoreLabel.textContent = `${player2Name}:`;
-    } else {
-      if (p2ScoreItem) p2ScoreItem.classList.add('hidden');
-    }
-
-    this.gameState.isRunning = true;
-    this.gameState.currentPlayerIndex = 0;
-
-    // 隐藏输入界面，显示游戏界面
-    this.playerInput.classList.add('hidden');
-    this.gameInterface.classList.remove('hidden');
-
-    // 开始游戏
-    this.startNewRound();
-    this.startTimers();
-
-    this.addLogEntry('system', `游戏开始！模式: ${this.gameState.gameMode === 'single' ? '单人挑战' : '双人对抗'}`, true);
-  }
-
-  startNewRound() {
-    if (!this.gameState.isRunning) return;
-
-    const currentPlayer = this.gameState.players[this.gameState.currentPlayerIndex];
-
-    // 更新当前玩家显示
-    this.currentPlayerNameEl.textContent = currentPlayer;
-
-    // 生成随机词语
-    this.gameState.currentWord = this.getRandomWord();
-    this.currentWordEl.textContent = this.gameState.currentWord;
-
-    // 重置本轮时间
-    this.gameState.roundTimeLeft = this.gameState.roundTime;
-    this.updateTimerDisplay();
-
-    // 重置本轮描述历史
-    this.gameState.roundDescriptions = [];
-
-    // 清空描述输入框
-    this.descriptionInput.value = '';
-
-    this.addLogEntry('system', `轮到 ${currentPlayer}，词语是: ${this.gameState.currentWord}`, true);
-  }
-
-  getRandomWord() {
-    const randomIndex = Math.floor(Math.random() * this.allWords.length);
-    return this.allWords[randomIndex];
-  }
-
-  async handleSubmitDescription() {
-    const description = this.descriptionInput.value.trim();
-    if (!description) {
-      alert('请输入描述！');
-      return;
-    }
-
-    if (!this.gameState.isRunning) {
-      alert('游戏未开始！');
-      return;
-    }
-
-    const currentPlayer = this.gameState.players[this.gameState.currentPlayerIndex];
-
-    // 添加描述到本轮描述历史
-    this.gameState.roundDescriptions.push(description);
-
-    // 添加玩家描述到日志
-    this.addLogEntry('player', `${currentPlayer}: "${description}"`);
-
-    // 检查是否作弊（这里只是模拟，实际需要调用后端API）
-    if (this.isCheating(this.gameState.currentWord, description)) {
-      this.addLogEntry('system', `检测到作弊！${currentPlayer} 直接说出了词语或其近义词。本轮跳过。`);
-      this.nextRound();
-      return;
-    }
-
-    // 模拟AI猜测（实际应该调用后端API）
-    this.addLogEntry('system', 'AI正在思考...');
-
-    try {
-      // 调用后端AI接口
-      this.submitDescriptionBtn.disabled = true;
-      this.submitDescriptionBtn.innerHTML = '<span class="loading-spinner"></span> 正在思考...';
-
-      const response = await fetch('/api/guess', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          description: description,
-          allDescriptions: this.gameState.roundDescriptions
-        })
-      });
-
-      const data = await response.json();
-
-      this.submitDescriptionBtn.disabled = false;
-      this.submitDescriptionBtn.textContent = '提交描述';
-
-      if (response.ok) {
-        const aiGuess = data.guess;
-        this.addLogEntry('ai', `AI猜测: ${aiGuess}`);
-
-        // 检查AI是否猜对
-        if (aiGuess === this.gameState.currentWord) {
-          this.gameState.scores[currentPlayer]++;
-          this.updateScoresDisplay();
-
-          this.addLogEntry('system', `🎉 恭喜！AI猜对了！${currentPlayer} 得1分。`);
-
-          // AI猜对了，进入下一轮
-          setTimeout(() => {
-            this.nextRound();
-          }, 2000);
+  showCountdown() {
+    this.playerNameInput.classList.add('hidden');
+    this.countdownOverlay.classList.remove('hidden');
+    let c = 3;
+    this.countdownNumber = document.getElementById('countdown-number');
+    this.countdownNumber.textContent = c;
+    const t = setInterval(() => {
+      c--;
+      if (c <= 0) {
+        clearInterval(t);
+        this.countdownOverlay.classList.add('hidden');
+        if (this.gameState.gameMode === 'dual') {
+          this.socket.emit('start-game-dual', this.roomId);
         } else {
-          this.addLogEntry('system', `AI猜错了。还有 ${this.gameState.roundTimeLeft} 秒继续描述。`);
-
-          // 清空输入框，等待下一次描述
-          this.descriptionInput.value = '';
-          this.descriptionInput.focus();
+          this.startGameLogic();
         }
       } else {
-        throw new Error(data.error || 'AI猜测失败');
-      }
-    } catch (error) {
-      console.error('AI猜测错误:', error);
-      this.addLogEntry('system', `AI猜测出现错误: ${error.message}`);
-
-      // 清空输入框，等待下一次描述
-      this.descriptionInput.value = '';
-      this.descriptionInput.focus();
-    }
-  }
-
-  handleSkipRound() {
-    if (!this.gameState.isRunning) {
-      alert('游戏未开始！');
-      return;
-    }
-
-    const currentPlayer = this.gameState.players[this.gameState.currentPlayerIndex];
-    this.addLogEntry('system', `${currentPlayer} 选择了跳过本轮。正确答案是: ${this.gameState.currentWord}`);
-
-    this.nextRound();
-  }
-
-  nextRound() {
-    // 切换到下一个玩家
-    if (this.gameState.gameMode === 'dual' && this.gameState.players.length > 1) {
-      this.gameState.currentPlayerIndex = (this.gameState.currentPlayerIndex + 1) % this.gameState.players.length;
-    }
-
-    // 开始新回合
-    setTimeout(() => {
-      if (this.gameState.isRunning) {
-        this.startNewRound();
+        this.countdownNumber.textContent = c;
       }
     }, 1000);
   }
 
-  startTimers() {
-    // 回合计时器
-    this.gameState.roundInterval = setInterval(() => {
-      this.gameState.roundTimeLeft--;
-      this.updateTimerDisplay();
+  async startGameLogic() {
+    this.gameState.isRunning = true;
+    this.gameInterface.classList.remove('hidden');
 
-      if (this.gameState.roundTimeLeft <= 0) {
-        this.addLogEntry('system', `⏰ 时间到！本轮结束，词语是: ${this.gameState.currentWord}`);
-        this.nextRound();
+    if (this.gameState.gameMode === 'dual') {
+      this.oppProgressBadge.classList.remove('hidden');
+      this.roundInfoEl.classList.remove('hidden');
+    } else {
+      this.oppProgressBadge.classList.add('hidden');
+      this.roundInfoEl.classList.add('hidden');
+      // 单人随机生成词
+      const res = await fetch('/api/random-word');
+      const data = await res.json();
+      this.gameState.words = [data.word];
+    }
+
+    this.updateWordDisplay();
+    this.startTimer();
+  }
+
+  updateWordDisplay() {
+    const word = this.gameState.words[this.gameState.currentIndex] || '结束';
+    this.currentWordEl.textContent = word;
+    if (this.gameState.gameMode === 'dual') {
+      this.roundInfoEl.textContent = `第 ${this.gameState.currentIndex + 1}/10 词`;
+    }
+  }
+
+  async handleSubmit() {
+    const desc = this.descriptionInput.value.trim();
+    if (!desc || !this.gameState.isRunning) return;
+
+    this.addLogEntry('player', `${this.playerName}: ${desc}`);
+    this.gameState.roundDescriptions.push(desc);
+    this.descriptionInput.value = '';
+    this.submitDescBtn.disabled = true;
+
+    try {
+      const response = await fetch('/api/guess', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: desc, allDescriptions: this.gameState.roundDescriptions })
+      });
+      const data = await response.json();
+      this.addLogEntry('ai', `AI猜测: ${data.guess}`);
+
+      if (data.guess === this.gameState.words[this.gameState.currentIndex]) {
+        this.addLogEntry('system', '🎉 猜对了！');
+        this.gameState.score++;
+        this.nextWord();
       }
-    }, 1000);
+    } catch (e) { } finally {
+      this.submitDescBtn.disabled = false;
+    }
+  }
 
-    // 总游戏计时器
-    this.gameState.gameInterval = setInterval(() => {
-      this.gameState.gameTimeLeft--;
-      this.updateTimerDisplay();
+  handleSkip() {
+    this.addLogEntry('system', `跳过。正确答案: ${this.gameState.words[this.gameState.currentIndex]}`);
+    this.nextWord();
+  }
 
-      if (this.gameState.gameTimeLeft <= 0) {
-        this.endGame();
+  async nextWord() {
+    this.gameState.roundDescriptions = [];
+    if (this.gameState.gameMode === 'dual') {
+      this.gameState.currentIndex++;
+      const finished = this.gameState.currentIndex >= 10;
+      this.socket.emit('update-progress', {
+        roomId: this.roomId,
+        score: this.gameState.score,
+        currentIndex: this.gameState.currentIndex,
+        wordFinished: finished
+      });
+
+      if (finished) {
+        this.gameState.isRunning = false;
+        this.currentWordEl.textContent = "已完成！";
+        this.addLogEntry('system', '您已完成所有挑战，等待对手...');
+      } else {
+        this.updateWordDisplay();
       }
+    } else {
+      // 单人模式直接换新词
+      const res = await fetch('/api/random-word');
+      const data = await res.json();
+      this.gameState.words = [data.word];
+      this.updateWordDisplay();
+    }
+  }
+
+  startTimer() {
+    this.gameState.timer = setInterval(() => {
+      this.gameState.timeLeft--;
+      this.gameTimerEl.textContent = this.gameState.timeLeft;
+      if (this.gameState.timeLeft <= 0) this.endGame();
     }, 1000);
   }
 
-  updateTimerDisplay() {
-    this.roundTimerEl.textContent = this.gameState.roundTimeLeft;
-    this.gameTimerEl.textContent = this.gameState.gameTimeLeft;
-  }
-
-  updateScoresDisplay() {
-    const player1Name = this.gameState.players[0];
-    if (this.player1Score) this.player1Score.textContent = this.gameState.scores[player1Name] || 0;
-
-    if (this.gameState.gameMode === 'dual' && this.gameState.players.length > 1) {
-      const player2Name = this.gameState.players[1];
-      if (this.player2Score) this.player2Score.textContent = this.gameState.scores[player2Name] || 0;
-    }
-  }
-
-  addLogEntry(type, message, scrollToBottom = false) {
-    const entry = document.createElement('div');
-    entry.className = `log-entry ${type}`;
-    entry.textContent = message;
-    this.logContainer.appendChild(entry);
-
-    // 始终自动滚动到底部
-    this.logContainer.scrollTop = this.logContainer.scrollHeight;
-  }
-
-  isCheating(originalWord, description) {
-    // 简单的防作弊检测（实际应该调用后端API）
-    const normalizedOriginal = this.normalizeText(originalWord);
-    const normalizedDescription = this.normalizeText(description);
-
-    // 检查是否直接包含原词
-    if (normalizedDescription.includes(normalizedOriginal)) {
-      return true;
-    }
-
-    // 这里可以添加更复杂的检测逻辑
-    return false;
-  }
-
-  normalizeText(text) {
-    return text.replace(/[^\u4e00-\u9fa5\w\s]/g, '').trim();
-  }
-
-  simulateAIGuess(description) {
-    // 模拟AI猜测逻辑，基于描述中的关键词
-    const keywords = description.replace(/[^\u4e00-\u9fa5\w\s]/g, ' ')
-      .split(/\s+/)
-      .filter(k => k.length > 0);
-
-    // 简单的匹配逻辑，实际应该调用后端AI接口
-    if (keywords.some(k => k.includes('水果'))) {
-      return ['苹果', '香蕉'].sort(() => Math.random() - 0.5)[0];
-    } else if (keywords.some(k => k.includes('计算') || k.includes('电脑'))) {
-      return '电脑';
-    } else if (keywords.some(k => k.includes('书') || k.includes('阅读'))) {
-      return '书本';
-    } else if (keywords.some(k => k.includes('住') || k.includes('家'))) {
-      return '房子';
-    } else if (keywords.some(k => k.includes('交通工具') || k.includes('轮子'))) {
-      return '汽车';
-    } else if (keywords.some(k => k.includes('通讯') || k.includes('打电话'))) {
-      return '电话';
-    } else if (keywords.some(k => k.includes('液体') || k.includes('喝'))) {
-      return '水';
-    } else if (keywords.some(k => k.includes('发光') || k.includes('天空'))) {
-      return '太阳';
-    } else if (keywords.some(k => k.includes('植物') || k.includes('绿色'))) {
-      return '树';
-    } else if (keywords.some(k => k.includes('宠物') || k.includes('汪'))) {
-      return '狗';
-    } else if (keywords.some(k => k.includes('喵') || k.includes('抓'))) {
-      return '猫';
-    }
-
-    // 随机返回一个词
-    return this.allWords[Math.floor(Math.random() * 20)]; // 前20个常用词
-  }
-
-  endGame() {
+  endGame(results = null) {
     this.gameState.isRunning = false;
-
-    // 清除定时器
-    if (this.gameState.roundInterval) {
-      clearInterval(this.gameState.roundInterval);
-    }
-    if (this.gameState.gameInterval) {
-      clearInterval(this.gameState.gameInterval);
-    }
-
-    // 显示最终得分
-    this.showFinalScores();
-
-    // 隐藏游戏界面，显示结束界面
+    clearInterval(this.gameState.timer);
     this.gameInterface.classList.add('hidden');
     this.gameOver.classList.remove('hidden');
-  }
 
-  showFinalScores() {
-    // 清空之前的分数显示
-    this.finalScoreList.innerHTML = '';
+    if (results) {
+      this.finalScoreList.innerHTML = results.map(p => `
+        <div class="final-score-item">
+          <span>${p.name}</span>
+          <span>${p.score}分 (${p.time}秒)</span>
+        </div>
+      `).join('');
 
-    // 显示每个玩家的分数
-    for (const [player, score] of Object.entries(this.gameState.scores)) {
-      const scoreItem = document.createElement('div');
-      scoreItem.className = 'final-score-item';
-      scoreItem.innerHTML = `
-        <span>${player}</span>
-        <span>${score} 分</span>
-      `;
-      this.finalScoreList.appendChild(scoreItem);
-    }
-
-    // 找出获胜者
-    let winner = '';
-    let highestScore = -1;
-    for (const [player, score] of Object.entries(this.gameState.scores)) {
-      if (score > highestScore) {
-        highestScore = score;
-        winner = player;
-      }
-    }
-
-    if (winner) {
-      this.winnerMessage.innerHTML = `🏆 获胜者: <strong>${winner}</strong> (${highestScore} 分)`;
+      const winner = this.determineWinner(results);
+      this.winnerMsg.innerHTML = winner ? `🏆 胜者: ${winner.name}` : '握手言和！';
     } else {
-      this.winnerMessage.textContent = '比分持平！';
+      this.finalScoreList.innerHTML = `<div class="final-score-item"><span>您的得分</span><span>${this.gameState.score}</span></div>`;
     }
   }
 
-  resetGame() {
-    // 清除定时器
-    if (this.gameState.roundInterval) {
-      clearInterval(this.gameState.roundInterval);
-    }
-    if (this.gameState.gameInterval) {
-      clearInterval(this.gameState.gameInterval);
-    }
+  determineWinner(players) {
+    const [p1, p2] = players;
+    if (p1.score > p2.score) return p1;
+    if (p2.score > p1.score) return p2;
+    if (p1.time < p2.time) return p1;
+    if (p2.time < p1.time) return p2;
+    return null;
+  }
 
-    // 重置游戏状态
-    this.gameState = {
-      isRunning: false,
-      players: [],
-      currentPlayerIndex: 0,
-      currentWord: '',
-      scores: {},
-      gameMode: 'single',
-      roundTime: 30,
-      totalTime: 300,
-      roundTimeLeft: 30,
-      gameTimeLeft: 300,
-      roundInterval: null,
-      gameInterval: null
-    };
-
-    // 重置UI
-    this.gameOver.classList.add('hidden');
-    this.modeSelection.classList.remove('hidden');
-
-    // 清空输入
-    this.player1Name.value = '';
-    this.player2Name.value = '';
-    this.player2Input.classList.add('hidden');
-
-    // 清空日志
-    this.logContainer.innerHTML = '';
-
-    // 重置显示
-    if (this.currentWordEl) this.currentWordEl.textContent = '[词语]';
-    if (this.currentPlayerNameEl) this.currentPlayerNameEl.textContent = '-';
-    if (this.player1Score) this.player1Score.textContent = '0';
-    if (this.player2Score) this.player2Score.textContent = '0';
-    if (this.roundTimerEl) this.roundTimerEl.textContent = '30';
-    if (this.gameTimerEl) this.gameTimerEl.textContent = '300';
+  addLogEntry(type, msg) {
+    const d = document.createElement('div');
+    d.className = `log-entry ${type}`;
+    d.textContent = msg;
+    this.logContainer.appendChild(d);
+    this.logContainer.scrollTop = this.logContainer.scrollHeight;
   }
 }
 
-// 初始化游戏
-document.addEventListener('DOMContentLoaded', () => {
-  new ChineseGuessWordGame();
-});
+window.onload = () => { new ChineseGuessWordGame(); };
